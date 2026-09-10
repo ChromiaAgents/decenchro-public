@@ -1,0 +1,6 @@
+name: decenchro-guard
+version: 0.1.0
+description: "Route Decenchro tool calls through the Atbash judge before execution. Allow / hold / block based on operator-defined policy, with on-chain audit trail."
+author: Decenchro
+hooks:
+  - pre_tool_call

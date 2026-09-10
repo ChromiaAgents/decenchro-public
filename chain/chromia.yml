@@ -1,0 +1,44 @@
+blockchains:
+  agent_memory:
+    module: main
+    moduleArgs:
+      lib.ft4.core.accounts:
+        rate_limit:
+          active: true
+          max_points: 10
+          recovery_time: 5000
+          points_at_account_creation: 2
+      lib.ft4.core.admin:
+        # Replace with hex from: chr keygen --key-id decenchro
+        # Then: cat ~/.chromia/decenchro.pubkey
+        admin_pubkey: "02C56F1E1BA400853EB87E10C9DF263504C2061BB08D414D88E5258FD75BF2C518"
+      memory:
+        admin_pubkey: "02C56F1E1BA400853EB87E10C9DF263504C2061BB08D414D88E5258FD75BF2C518"
+    config:
+      features:
+        merkle_hash_version: 2
+compile:
+  rellVersion: 0.15.0
+libs:
+  ft4:
+    registry: https://gitlab.com/chromaway/ft4-lib.git
+    path: rell/src/lib/ft4
+    tagOrBranch: v1.1.0r
+    rid: x"FEEB0633698E7650D29DCCFE2996AD57CDC70AA3BDF770365C3D442D9DFC2A5E"
+    insecure: false
+database:
+  schema: schema_agent_memory
+test:
+  modules:
+    - test
+  moduleArgs:
+    lib.ft4.core.accounts:
+      rate_limit:
+        active: true
+        max_points: 10
+        recovery_time: 5000
+        points_at_account_creation: 2
+    lib.ft4.core.admin:
+      admin_pubkey: "02466d7fcae563e5cb09a0d1870bb580344804617879a14949cf22285f1bae3f27"
+    memory:
+      admin_pubkey: "02466d7fcae563e5cb09a0d1870bb580344804617879a14949cf22285f1bae3f27"

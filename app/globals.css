@@ -1,0 +1,453 @@
+@import "tailwindcss";
+
+@theme {
+  /* Unified with the home (.dh) palette in app/home.css — warm off-white
+     canvas, white cards, teal-tinted dark for console surfaces. */
+  --color-paper: #ffffff;
+  --color-canvas: #faf8f5;
+  --color-canvas-deep: #f0ede6;
+  --color-canvas-ink: #131311;
+
+  /* Warm near-black ink (home --ink scale) */
+  --color-ink: #131311;
+  --color-ink-body: #4b4a45;
+  --color-ink-mid: #5f5e57;
+  --color-ink-soft: #77766f;
+  /* 5.02:1 on paper. Was #8b8a82, which measured 3.47:1 — under AA for the
+     12px micro-labels it is used on, everywhere from /agents to the console. */
+  --color-ink-faint: #726f66;
+
+  --color-rule: #e7e2d8;
+  --color-rule-strong: #cfc9bd;
+
+  /* Softened corners on the product surfaces, and nothing else: no shadow, no
+     blur (user decision 2026-08-22, "I want flat, don't want any shadow", after
+     a shadowed pass). Depth now comes from the tile gaps and the hairline, not
+     from elevation. */
+  --radius-deck: 10px;
+
+  /* The dark console — teal-tinted dark, matches home --dark bands. The
+     dashboard remaps every one of these to the light /agents palette in
+     `.console-light` below; these values are what a dark surface would get. */
+  --color-console: #0e1a17;
+  --color-console-deep: #0a1411;
+  --color-console-rule: #24332e;
+  --color-console-ink: #f7f7f2;
+  --color-console-mid: #c6cdc8;
+  --color-console-faint: #93a29b;
+  --color-console-soft: #b3bdb8; /* between mid and faint; retuned on light */
+
+  /* Danger. Declared here so the utility exists; `.console-light` retunes it
+     for the light ground. Replaces five copies of a hardcoded oklch literal. */
+  --color-danger: oklch(70% 0.18 25);
+
+  /* Teal — the single signal. Deep on light surfaces, bright on dark. */
+  --color-accent: #0e7569;
+  --color-accent-soft: #ddf2ec;
+  --color-accent-bright: #47c8b2;
+
+  --color-signal: oklch(72% 0.17 150);
+  --color-warn: oklch(78% 0.14 72);
+  --color-warn-ink: oklch(52% 0.13 60); /* warn, dark enough for light surfaces (AA at small sizes) */
+
+  /* Unified with home: Helvetica Neue for prose/display, JetBrains Mono for
+     data, terminal readouts, and labels. */
+  --font-display: "Helvetica Neue", Helvetica, Arial, ui-sans-serif, sans-serif;
+  --font-sans: "Helvetica Neue", Helvetica, Arial, ui-sans-serif, sans-serif;
+  --font-mono: var(--font-mono-app), "JetBrains Mono", ui-monospace,
+    "SFMono-Regular", Menlo, monospace;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "cv11", "ss01", "ss03";
+  }
+
+  body {
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.55;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  ::selection {
+    background: var(--color-accent);
+    color: var(--color-canvas);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 3px;
+  }
+}
+
+@utility rule-h {
+  height: 1px;
+  background: var(--color-rule);
+}
+
+@keyframes blink-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+@keyframes slide-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes reveal {
+  0% { opacity: 0; transform: translateY(14px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.animate-blink {
+  animation: blink-dot 1.8s ease-in-out infinite;
+}
+
+.animate-reveal {
+  animation: reveal 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.stagger > * {
+  opacity: 0;
+  animation: reveal 900ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.stagger > *:nth-child(1) { animation-delay: 0ms; }
+.stagger > *:nth-child(2) { animation-delay: 90ms; }
+.stagger > *:nth-child(3) { animation-delay: 180ms; }
+.stagger > *:nth-child(4) { animation-delay: 270ms; }
+.stagger > *:nth-child(5) { animation-delay: 360ms; }
+.stagger > *:nth-child(6) { animation-delay: 450ms; }
+.stagger > *:nth-child(7) { animation-delay: 540ms; }
+
+/* Crosshair corner markers */
+.crosshair::before,
+.crosshair::after {
+  content: "";
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-color: var(--color-ink);
+  border-style: solid;
+  border-width: 0;
+}
+.crosshair::before {
+  top: -1px;
+  left: -1px;
+  border-top-width: 1px;
+  border-left-width: 1px;
+}
+.crosshair::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom-width: 1px;
+  border-right-width: 1px;
+}
+
+/* Scroll-triggered reveal — content lifts in as a section enters view */
+@media (prefers-reduced-motion: no-preference) {
+  .reveal > * {
+    opacity: 0;
+    transform: translateY(22px);
+    transition:
+      opacity 720ms cubic-bezier(0.22, 1, 0.36, 1),
+      transform 720ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .reveal.is-visible > * {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .reveal.is-visible > *:nth-child(2) { transition-delay: 90ms; }
+  .reveal.is-visible > *:nth-child(3) { transition-delay: 180ms; }
+}
+
+/* Console caret — the agent thinking */
+@keyframes caret-blink {
+  0%, 48% { opacity: 1; }
+  52%, 100% { opacity: 0; }
+}
+.animate-caret {
+  animation: caret-blink 1.1s steps(1) infinite;
+}
+
+/* Pipeline dot — travels from one node to the next along the arrow */
+@keyframes pipe-dot {
+  0%   { transform: translateX(0);    opacity: 1; }
+  78%  { opacity: 1; }
+  100% { transform: translateX(54px); opacity: 0; }
+}
+.pipe-dot {
+  animation: pipe-dot 900ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Logo mark draw-in — one-shot on mount (pixel2motion choreography:
+   tile arrives, connector draws, square draws). Dash/hidden states are scoped
+   to .logo-anim so a static <LogoMark> is unaffected. */
+.logo-anim .lm-tile,
+.logo-anim .lm-square {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.logo-anim .lm-tile {
+  animation: lm-tile 760ms cubic-bezier(0.34, 0, 0.14, 1) both;
+}
+.logo-anim .lm-conn {
+  stroke-dasharray: 1 1;
+  animation: lm-draw 620ms 200ms cubic-bezier(0, 0, 0.2, 1) both;
+}
+.logo-anim .lm-square {
+  stroke-dasharray: 1 1;
+  animation: lm-square 560ms 300ms cubic-bezier(0, 0, 0.2, 1) both;
+}
+@keyframes lm-tile {
+  0%   { opacity: 0; transform: translate(5px, 4px) scale(0.92); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes lm-draw {
+  from { stroke-dashoffset: 1; }
+  to   { stroke-dashoffset: 0; }
+}
+@keyframes lm-square {
+  0%   { stroke-dashoffset: 1; transform: translate(-2px, 2px); }
+  100% { stroke-dashoffset: 0; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Liquid Glass ─────────────────────────────────────────────────────────
+   Web translation of Apple's iOS 26 Liquid Glass, for the dashboard only.
+   The marketing site keeps the flat, sharp, shadowless treatment DESIGN.md
+   specifies; this material lives on the dark `console` surfaces where
+   translucency actually has something to refract.
+
+   The source skill is SwiftUI/UIKit (`.glassEffect()`, `UIGlassEffect`), so
+   these are the CSS equivalents of its four ingredients:
+
+     blur behind         -> backdrop-filter: blur() saturate()
+     light from around   -> a translucent fill plus a specular top edge
+     depth               -> layered inset highlight + a soft ambient shadow
+     reacts to pointer   -> .glass-interactive (opt-in, per the skill's
+                            .interactive() being explicit rather than default)
+
+   Two variants, matching the skill's `.regular` and `.tint()`:
+     .glass            regular material, for panels and cards
+     .glass-prominent  tinted with the teal signal, for the active/primary thing
+
+   Contrast is the constraint the skill calls out ("text on glass must remain
+   readable"): the fills below stay dark enough that console-ink text holds AA
+   on top of whatever shows through. Don't lighten them without re-checking.  */
+
+@theme {
+  /* Fill + edge, tuned for the console palette (#0e1a17). */
+  --glass-fill: color-mix(in oklab, var(--color-console) 62%, transparent);
+  --glass-fill-raised: color-mix(in oklab, var(--color-console) 48%, transparent);
+  --glass-tint: color-mix(in oklab, var(--color-accent-bright) 14%, transparent);
+  --glass-edge: color-mix(in oklab, #ffffff 14%, transparent);
+  --glass-edge-strong: color-mix(in oklab, #ffffff 26%, transparent);
+  --glass-shadow: 0 1px 2px rgb(0 0 0 / 0.28), 0 8px 24px -6px rgb(0 0 0 / 0.45);
+  /* iOS uses 16pt on rect glass; 14px reads equivalently at web density. */
+  --glass-radius: 14px;
+  --glass-blur: 20px;
+}
+
+/* ── Dashboard surfaces ───────────────────────────────────────────────
+   The console renders in the marketplace's material (user decision 2026-08-22,
+   "revamp the whole according to /agents"): one warm ground, white panels,
+   hairline rules, sharp corners, teal as the only signal. Sidebar included —
+   the old dark rail is gone, so there is no `.console-dark` opt-out any more.
+
+   The console-* names are kept rather than renamed across ~500 call sites:
+   Tailwind v4 compiles utilities to var(--color-*), so remapping the tokens
+   here repaints every one of them. Read the comments for the /agents token each
+   name now carries. Marketing keeps the @theme values, being outside this scope. */
+.console-light {
+  --color-console-deep: #faf8f5; /* canvas: the page ground */
+  --color-console: #ffffff; /* paper: panels sit ABOVE the ground, as on /agents */
+  --color-console-rule: #e7e2d8; /* rule */
+  --color-console-ink: #131311; /* ink */
+  --color-console-mid: #5f5e57; /* ink-mid */
+  --color-console-faint: #726f66; /* ink-faint: the micro-label grey, AA-safe */
+  --color-console-soft: #77766f; /* ink-soft: one step darker, for body-ish meta */
+  --color-accent-bright: var(--color-accent); /* teal darkens for light ground */
+
+  /* Danger had been five copies of the same literal. One token, dark enough to
+     pass AA on the light ground (the amber `warn` never did). */
+  --color-danger: oklch(52% 0.18 25);
+
+  /* No glass on this surface: a flat paper fill inside a rule hairline, square.
+     Neutralising the material here keeps the utility in place while rendering
+     exactly the /agents card. */
+  --glass-fill: var(--color-paper);
+  --glass-fill-raised: var(--color-paper);
+  --glass-tint: color-mix(in oklab, var(--color-accent-soft) 70%, transparent);
+  --glass-edge: var(--color-rule);
+  --glass-edge-strong: transparent;
+  --glass-shadow: none;
+  --glass-radius: 0; /* sharp: pills are the only rounded element (DESIGN.md) */
+}
+
+/* The blur has nothing to refract once the fill is opaque, and it still costs a
+   compositing pass, so drop it rather than leave it running at 0. The sheen and
+   the press-scale go with it: /agents cards react by moving their border colour,
+   nothing else. */
+.console-light :is(.glass, .glass-prominent, .glass-sheet) {
+  backdrop-filter: none;
+}
+.console-light .glass-interactive::after {
+  display: none;
+}
+.console-light .glass-interactive:active {
+  transform: none;
+}
+
+/* The one micro-label. Four tracking values and six sizes collapsed into this,
+   at the 12px/0.14em the marketplace settled on (DESIGN.md 2026-06-30: smaller
+   read "too small and too shouty"). */
+@utility label-micro {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+/* The product-surface panel shape, in one place rather than a radius repeated
+   down 45 class strings. Carries no colour and no shadow: the caller brings its
+   own fill and rule, so the same utility serves the console's `bg-console`
+   panels and the marketplace's `bg-paper` ones. */
+@utility deck {
+  border-radius: var(--radius-deck);
+}
+
+/* A card that reacts by moving its border colour, and nothing else. */
+@utility deck-interactive {
+  border-radius: var(--radius-deck);
+  transition: border-color 200ms ease;
+}
+
+/* The material. Composition order matters: the fill sits above the blurred
+   backdrop, the specular edge above the fill. */
+@utility glass {
+  position: relative;
+  background: var(--glass-fill);
+  backdrop-filter: blur(var(--glass-blur)) saturate(175%);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--glass-radius);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 0 var(--glass-edge-strong);
+}
+
+/* Tinted variant — the skill's `.tint()`, reserved for prominence. Using it on
+   more than one element per view defeats the point. */
+@utility glass-prominent {
+  position: relative;
+  background: linear-gradient(var(--glass-tint), var(--glass-tint)),
+    var(--glass-fill-raised);
+  backdrop-filter: blur(var(--glass-blur)) saturate(190%);
+  border: 1px solid color-mix(in oklab, var(--color-accent-bright) 34%, transparent);
+  border-radius: var(--glass-radius);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 0 var(--glass-edge-strong);
+}
+
+/* A lighter sheet for nested surfaces. Nesting full `.glass` inside `.glass` is
+   an anti-pattern in the skill (stacked blurs cost performance and muddy the
+   result), so inner surfaces get fill and edge without a second backdrop pass. */
+@utility glass-sheet {
+  background: var(--glass-fill-raised);
+  border: 1px solid var(--glass-edge);
+  border-radius: calc(var(--glass-radius) - 4px);
+}
+
+/* Opt-in pointer response, per the skill: only things that actually respond to
+   input should look like they do. The sheen is a pseudo-element so it can fade
+   without repainting the blur. */
+@utility glass-interactive {
+  transition: background-color 180ms ease, border-color 180ms ease,
+    box-shadow 220ms ease, transform 180ms ease;
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(
+      120% 80% at 50% 0%,
+      color-mix(in oklab, #ffffff 12%, transparent),
+      transparent 70%
+    );
+    opacity: 0;
+    transition: opacity 220ms ease;
+    pointer-events: none;
+  }
+
+  &:hover::after {
+    opacity: 1;
+  }
+
+  &:hover {
+    border-color: var(--glass-edge-strong);
+  }
+
+  /* Presses in rather than lifting: glass is a surface, not a floating card. */
+  &:active {
+    transform: scale(0.985);
+  }
+}
+
+/* Capsule shape — the skill's default for controls. Pills were already the only
+   rounded element in the brand, so glass controls inherit that shape. */
+@utility glass-capsule {
+  border-radius: 9999px;
+}
+
+/* The skill's GlassEffectContainer: siblings share one stacking/backdrop context
+   so their blurs resolve together, and `gap` is the analogue of its `spacing`.
+   Wrap sibling glass elements in this rather than leaving them standalone. */
+@utility glass-container {
+  isolation: isolate;
+  display: flex;
+  gap: 12px;
+}
+
+/* Blur is the expensive part and the first thing to drop when the device or the
+   user says so. Both fallbacks keep a readable opaque surface. */
+@supports not (backdrop-filter: blur(1px)) {
+  .glass,
+  .glass-prominent {
+    background: var(--color-console);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass,
+  .glass-prominent,
+  .glass-sheet {
+    backdrop-filter: none;
+    background: var(--color-console);
+  }
+}

@@ -1,0 +1,39 @@
+function require_namespace_owner(ns: agent_namespace, signer: pubkey) {
+    require(ns.owner == signer, "Only namespace owner can perform this action");
+}
+
+// Split a comma-separated tags string into trimmed, de-duplicated tags.
+function parse_tags(raw: text): list<text> {
+    val result = list<text>();
+    for (part in raw.split(",")) {
+        val t = part.trim();
+        if (t.size() > 0 and not result.contains(t)) {
+            result.add(t);
+        }
+    }
+    return result;
+}
+
+// Rebuild the memory_tag index rows for an entry from its tags string.
+function sync_memory_tags(entry: memory_entry, raw: text) {
+    delete memory_tag @* { .memory_entry == entry };
+    for (t in parse_tags(raw)) {
+        create memory_tag(memory_entry = entry, tag = t);
+    }
+}
+
+// Set an entry's embedding from a client-supplied vector: create or replace it
+// when non-empty, drop any existing one when empty (a stale vector is worse
+// than none). Used by store and update.
+function upsert_embedding(entry: memory_entry, vector: text) {
+    val existing = memory_embedding @? { .memory_entry == entry };
+    if (vector.size() > 0) {
+        if (existing != null) {
+            update existing ( vector = vector );
+        } else {
+            create memory_embedding(memory_entry = entry, vector = vector);
+        }
+    } else if (existing != null) {
+        delete existing;
+    }
+}

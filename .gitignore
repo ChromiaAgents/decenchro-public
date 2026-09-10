@@ -1,0 +1,44 @@
+.env
+*.env.local
+node_modules/
+.next/
+.vercel/
+*.log
+.DS_Store
+next-env.d.ts
+tsconfig.tsbuildinfo
+build/
+.vercel
+.dev-local/
+
+# Local agent/editor tooling (not app code)
+.claude/
+.agents/
+.venv/
+/skills/
+skills-lock.json
+
+# Supabase CLI temp
+supabase/.temp/
+
+outputs
+# Python bytecode
+cloud-init/__pycache__/
+*.pyc
+
+# Rendered video artifacts. Generated output, not source: videos/ holds only
+# renders and thumbnails, and the demo mp4s are rebuildable. Keeping them out
+# also keeps multi-MB binaries out of the history.
+*.mp4
+videos/
+
+# bun.lock is deliberately NOT committed: package-lock.json is the source of
+# truth and CI installs with `npm ci`. Committing a bun.lock would also switch
+# Vercel's package manager to bun on the next production build, which is a
+# bigger change than it looks. Delete this line if bun becomes the standard.
+bun.lock
+
+# Local operator helpers, generated per-machine. Never committed: the schema
+# dump goes stale the moment a migration lands, and the env copier is scratch.
+uat-schema.sql
+copy-env-to.sh

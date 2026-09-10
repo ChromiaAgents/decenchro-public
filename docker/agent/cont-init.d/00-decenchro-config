@@ -1,0 +1,186 @@
+#!/command/with-contenv sh
+# shellcheck shell=sh
+# Seed the agent's identity and config from environment variables.
+#
+# Runs as root, BEFORE the base image's 01-hermes-setup, and before any s6 user
+# service starts. The ordering is load-bearing, not cosmetic: stage2's seed_one()
+# copies cli-config.yaml.example to $HERMES_HOME/config.yaml when none exists, and
+# it wins on a fresh volume if we run after it. That stock config has no
+# `plugins.enabled`, so the guard never loads and the agent signs nothing
+# on-chain. Both seeders are "only if absent", so whoever writes first wins —
+# hence 00-.
+#
+# This replaces what cloud-init used to do by writing files onto a fresh VPS.
+# Everything here is idempotent: safe on first boot, on container restart, and
+# after an image upgrade.
+#
+# ponytail: chowns run here, before stage2's optional HERMES_UID/PUID remap. We
+# never set those, and the agent only READS the payload, so a remapped uid would
+# still work. If per-host UID remap is ever wanted, split the chown into a second
+# hook numbered above 01.
+set -eu
+
+HERMES_HOME="${HERMES_HOME:-/opt/data}"
+PAYLOAD="${DECENCHRO_PAYLOAD:-/opt/decenchro}"
+
+log() { echo "[decenchro] $*"; }
+
+# Progress callback to the console. Fire-and-forget: a provisioning webhook must
+# never be able to fail a boot. Token is the per-deployment HMAC derived by the
+# console (lib/dashboard/deploy-token.ts) — the raw secret never ships here.
+webhook() {
+    [ -n "${DEPLOY_WEBHOOK_URL:-}" ] || return 0
+    [ -n "${DEPLOYMENT_ID:-}" ] || return 0
+    curl -sf -X POST --max-time 10 \
+        "${DEPLOY_WEBHOOK_URL}?id=${DEPLOYMENT_ID}&${1}&token=${DEPLOY_WEBHOOK_TOKEN:-}" \
+        >/dev/null 2>&1 || true
+}
+
+webhook "phase=5"
+
+mkdir -p "$HERMES_HOME/workspace"
+
+# ── .env ──────────────────────────────────────────────────────────────────
+# The managed keys are rewritten from the environment on every boot, so
+# rotating a secret is a restart rather than a redeploy. Everything else in the
+# file is carried over verbatim — `hermes gateway enroll` writes relay creds
+# there, and clobbering them would break an enrolled agent.
+#
+# The managed block is written FIRST on purpose: python-dotenv stops parsing at
+# the first malformed line, so our keys must precede any hand-added ones.
+ENV_FILE="$HERMES_HOME/.env"
+MANAGED="ATBASH_AGENT_KEY OPENROUTER_API_KEY TELEGRAM_BOT_TOKEN TELEGRAM_ALLOWED_USERS BSC_AGENT_KEY BSC_CHAIN_ID BSC_RPC_URL WHATSAPP_ALLOW_ALL_USERS ATBASH_FAIL_OPEN"
+
+env_new="${ENV_FILE}.new"
+: > "$env_new"
+chmod 600 "$env_new"
+for key in $MANAGED; do
+    val=$(printenv "$key" 2>/dev/null || true)
+    [ -n "$val" ] && printf '%s=%s\n' "$key" "$val" >> "$env_new"
+done
+if [ -f "$ENV_FILE" ]; then
+    grep -vE "^($(echo "$MANAGED" | tr ' ' '|'))=" "$ENV_FILE" >> "$env_new" || true
+fi
+mv "$env_new" "$ENV_FILE"
+chmod 600 "$ENV_FILE"
+
+# ── keep the dashboard off the public interface ───────────────────────────
+# Render adds every listening socket it detects to the set of ports it routes
+# ("Detected new open ports HTTP:9119, HTTP:9485"), and then sprays requests
+# across all of them: the health check lands on the dashboard and 404s, dashboard
+# assets land on the metrics server and 404, and the Hermes console is blank
+# while the agent reports healthy. openPorts is read-only through Render's API,
+# so the only fix is to listen on one port.
+#
+# The base image's dashboard service reads HERMES_DASHBOARD_HOST from the s6
+# container environment, so seeding it here is enough — no patch to a base run
+# script. Written only when the dashboard is on, so a VM deploy is untouched.
+#
+# SECURITY: Hermes' own auth gate engages only on a NON-loopback bind, so a
+# loopback dashboard does not authenticate. docker/agent/proxy.mjs enforces the
+# basic-auth check instead, and refuses to forward at all when no credentials are
+# set. Those two changes belong together — moving the bind without the proxy
+# check publishes /api/pty, a shell, to the internet.
+case "${HERMES_DASHBOARD:-}" in
+    1|true|TRUE|True|yes|YES|Yes)
+        if [ -d /run/s6/container_environment ]; then
+            printf '127.0.0.1' > /run/s6/container_environment/HERMES_DASHBOARD_HOST
+            echo "[decenchro] dashboard pinned to 127.0.0.1; proxy owns the public port"
+        fi
+        ;;
+esac
+
+# ── config.yaml + SOUL.md ─────────────────────────────────────────────────
+# Seeded once, then left alone: a claimed agent's operator may edit both, and a
+# restart must not revert their work.
+if [ ! -f "$HERMES_HOME/config.yaml" ]; then
+    # `|` as the sed delimiter — model ids contain slashes (openai/gpt-5.4-mini).
+    sed "s|__MODEL_ID__|${MODEL_ID:-openai/gpt-5.4-mini}|g" \
+        "$PAYLOAD/config.yaml.tmpl" > "$HERMES_HOME/config.yaml"
+    log "seeded config.yaml (model ${MODEL_ID:-openai/gpt-5.4-mini})"
+fi
+
+# Console theme: always refreshed, it is part of the image, not operator state.
+mkdir -p "$HERMES_HOME/dashboard-themes"
+cp "$PAYLOAD/dashboard-theme.yaml" "$HERMES_HOME/dashboard-themes/decenchro.yaml"
+# CLI/TUI skin, same rule.
+mkdir -p "$HERMES_HOME/skins"
+cp "$PAYLOAD/skin.yaml" "$HERMES_HOME/skins/decenchro.yaml"
+# config.yaml is seeded only-if-absent, so agents deployed before the theme and
+# skin existed never get `dashboard.theme` / `display.skin`; add them once.
+if [ -f "$HERMES_HOME/config.yaml" ]; then
+    if ! grep -q '^dashboard:' "$HERMES_HOME/config.yaml"; then
+        printf '\ndashboard:\n  theme: decenchro\n' >> "$HERMES_HOME/config.yaml"
+        log "config.yaml: added dashboard.theme decenchro"
+    fi
+    if ! grep -qE '^[[:space:]]+skin:' "$HERMES_HOME/config.yaml"; then
+        if grep -q '^display:' "$HERMES_HOME/config.yaml"; then
+            awk '{print} /^display:$/{print "  skin: decenchro"}' "$HERMES_HOME/config.yaml" > "$HERMES_HOME/config.yaml.new" \
+                && mv "$HERMES_HOME/config.yaml.new" "$HERMES_HOME/config.yaml"
+        else
+            printf '\ndisplay:\n  skin: decenchro\n' >> "$HERMES_HOME/config.yaml"
+        fi
+        log "config.yaml: added display.skin decenchro"
+    fi
+    if ! grep -q '^whatsapp:' "$HERMES_HOME/config.yaml"; then
+        printf '\nwhatsapp:\n  reply_prefix: ""\n' >> "$HERMES_HOME/config.yaml"
+        log "config.yaml: added whatsapp.reply_prefix (no reply header)"
+    fi
+fi
+
+if [ ! -f "$HERMES_HOME/SOUL.md" ] && [ -n "${SOUL_MD:-}" ]; then
+    printf '%s\n' "$SOUL_MD" > "$HERMES_HOME/SOUL.md"
+    log "seeded SOUL.md ($(wc -c < "$HERMES_HOME/SOUL.md") bytes)"
+fi
+
+# ── managed payload: plugins + skills ─────────────────────────────────────
+# Everything under $PAYLOAD/plugins/* and $PAYLOAD/skills/* is image-owned,
+# never hand-edited, so each is replaced outright (per-name rm -rf + cp -a)
+# when the image version changes. Without the stamp an upgraded image would
+# never reach an agent whose volume already had the old copy. Looping over
+# the payload instead of naming paths means a new plugin or skill ships by
+# being COPY'd into the image — no edit here.
+STAMP="$HERMES_HOME/.decenchro-payload"
+want="${DECENCHRO_PAYLOAD_VERSION:-dev}"
+if [ "$(cat "$STAMP" 2>/dev/null || true)" != "$want" ]; then
+    log "installing payload $want"
+    mkdir -p "$HERMES_HOME/plugins" "$HERMES_HOME/skills"
+    for kind in plugins skills; do
+        for src in "$PAYLOAD/$kind"/*/; do
+            [ -d "$src" ] || continue
+            src="${src%/}"
+            name="$(basename "$src")"
+            rm -rf "${HERMES_HOME:?}/$kind/$name"
+            cp -a "$src" "$HERMES_HOME/$kind/$name"
+            log "  installed $kind/$name"
+        done
+    done
+    printf '%s\n' "$want" > "$STAMP"
+else
+    log "payload $want already installed"
+fi
+
+# Warn loudly rather than failing the boot: an agent with no guard still talks,
+# it just signs nothing on-chain, and a half-booted box is harder to debug than
+# a running one with a clear log line.
+if [ -f "$HERMES_HOME/plugins/decenchro-guard/node_modules/@atbash/sdk/package.json" ]; then
+    log "decenchro-guard: @atbash/sdk present, node $(node --version)"
+else
+    log "WARNING: @atbash/sdk missing — the guard will no-op and nothing will be signed on-chain"
+fi
+
+# The DeFi skills degrade to read-only without a wallet key — worth a loud
+# line, not a failed boot: monitoring still works, trading refuses cleanly.
+if [ -z "${BSC_AGENT_KEY:-}" ]; then
+    log "WARNING: BSC_AGENT_KEY unset — DeFi skills will be read-only"
+fi
+
+chown -R hermes:hermes \
+    "$HERMES_HOME/plugins" "$HERMES_HOME/skills" "$HERMES_HOME/workspace" \
+    2>/dev/null || log "warning: chown of payload dirs failed (rootless?)"
+for f in "$ENV_FILE" "$HERMES_HOME/config.yaml" "$HERMES_HOME/SOUL.md" "$STAMP"; do
+    [ -e "$f" ] && { chown hermes:hermes "$f" 2>/dev/null || true; }
+done
+
+webhook "phase=6"
+log "config ready"

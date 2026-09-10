@@ -1,0 +1,233 @@
+import lib.ft4.auth;
+
+operation create_namespace(name: text, read_policy: text) {
+    val account = auth.authenticate();
+    val signer = op_context.get_signers()[0];
+
+    require(name.size() > 0, "Namespace name cannot be empty");
+    require(name.size() <= 64, "Namespace name too long (max 64 chars)");
+    require(
+        read_policy == "private" or read_policy == "shared" or read_policy == "public",
+        "read_policy must be private, shared, or public"
+    );
+
+    create agent_namespace(
+        name = name,
+        owner = signer,
+        read_policy = read_policy
+    );
+
+    create memory_audit(
+        agent_namespace = agent_namespace @ { .name == name },
+        actor = signer,
+        action = "create_namespace",
+        entry_id = "",
+        detail = "policy=" + read_policy
+    );
+}
+
+operation update_namespace_policy(name: text, read_policy: text) {
+    val account = auth.authenticate();
+    val signer = op_context.get_signers()[0];
+    val ns = agent_namespace @ { .name == name };
+
+    require(ns.owner == signer, "Only namespace owner can update policy");
+    require(
+        read_policy == "private" or read_policy == "shared" or read_policy == "public",
+        "read_policy must be private, shared, or public"
+    );
+
+    update ns ( read_policy = read_policy );
+
+    create memory_audit(
+        agent_namespace = ns,
+        actor = signer,
+        action = "update_policy",
+        entry_id = "",
+        detail = "new_policy=" + read_policy
+    );
+}
+
+operation store_memory(
+    namespace_name: text,
+    entry_id: text,
+    content: text,
+    source: text,
+    tags: text,
+    confidence: integer,
+    vector: text
+) {
+    val account = auth.authenticate();
+    val signer = op_context.get_signers()[0];
+    val ns = agent_namespace @ { .name == namespace_name };
+
+    require(ns.owner == signer, "Only namespace owner can store memories");
+    require(entry_id.size() > 0, "entry_id cannot be empty");
+    require(entry_id.size() <= 128, "entry_id too long (max 128 chars)");
+    require(content.size() > 0, "Content cannot be empty");
+    require(content.size() <= 10000, "Content too long (max 10000 chars)");
+    require(confidence >= 0 and confidence <= 100, "Confidence must be 0-100");
+
+    // Dedup: an exact-content memory already in this namespace is refreshed in
+    // place rather than copied. (source is immutable, so it keeps the original.)
+    val duplicate = memory_entry @? { .agent_namespace == ns, .content == content };
+    if (duplicate != null) {
+        update duplicate (
+            tags = tags,
+            confidence = confidence,
+            updated_at = op_context.last_block_time
+        );
+        sync_memory_tags(duplicate, tags);
+        upsert_embedding(duplicate, vector);
+
+        create memory_audit(
+            agent_namespace = ns,
+            actor = signer,
+            action = "store",
+            entry_id = duplicate.entry_id,
+            detail = "dedup,source=" + source + ",tags=" + tags
+        );
+        return;
+    }
+
+    val entry = create memory_entry(
+        agent_namespace = ns,
+        entry_id = entry_id,
+        content = content,
+        source = source,
+        tags = tags,
+        confidence = confidence
+    );
+
+    sync_memory_tags(entry, tags);
+    // Embedding is optional — stored only when the client supplied one.
+    // Without it the memory is still fully usable, just not semantically recallable.
+    upsert_embedding(entry, vector);
+
+    create memory_audit(
+        agent_namespace = ns,
+        actor = signer,
+        action = "store",
+        entry_id = entry_id,
+        detail = "source=" + source + ",tags=" + tags
+    );
+}
+
+operation update_memory(
+    namespace_name: text,
+    entry_id: text,
+    content: text,
+    tags: text,
+    confidence: integer,
+    vector: text
+) {
+    val account = auth.authenticate();
+    val signer = op_context.get_signers()[0];
+    val ns = agent_namespace @ { .name == namespace_name };
+
+    require(ns.owner == signer, "Only namespace owner can update memories");
+    require(content.size() > 0, "Content cannot be empty");
+    require(content.size() <= 10000, "Content too long (max 10000 chars)");
+    require(confidence >= 0 and confidence <= 100, "Confidence must be 0-100");
+
+    val entry = memory_entry @ { .agent_namespace == ns, .entry_id == entry_id };
+
+    update entry (
+        content = content,
+        tags = tags,
+        confidence = confidence,
+        updated_at = op_context.last_block_time
+    );
+
+    sync_memory_tags(entry, tags);
+    // Content changed, so the old embedding is stale — upsert_embedding replaces
+    // it with the fresh vector, or drops it if none was supplied.
+    upsert_embedding(entry, vector);
+
+    create memory_audit(
+        agent_namespace = ns,
+        actor = signer,
+        action = "update",
+        entry_id = entry_id,
+        detail = "tags=" + tags
+    );
+}
+
+operation delete_memory(namespace_name: text, entry_id: text) {
+    val account = auth.authenticate();
+    val signer = op_context.get_signers()[0];
+    val ns = agent_namespace @ { .name == namespace_name };
+
+    require(ns.owner == signer, "Only namespace owner can delete memories");
+
+    val entry = memory_entry @ { .agent_namespace == ns, .entry_id == entry_id };
+    delete memory_tag @* { .memory_entry == entry };
+    delete memory_embedding @* { .memory_entry == entry };
+    delete entry;
+
+    create memory_audit(
+        agent_namespace = ns,
+        actor = signer,
+        action = "delete",
+        entry_id = entry_id,
+        detail = ""
+    );
+}
+
+operation grant_access(namespace_name: text, grantee_pubkey: pubkey) {
+    val account = auth.authenticate();
+    val signer = op_context.get_signers()[0];
+    val ns = agent_namespace @ { .name == namespace_name };
+
+    require(ns.owner == signer, "Only namespace owner can grant access");
+    require(ns.read_policy == "shared", "Access grants only work with shared policy");
+
+    create access_grant(
+        agent_namespace = ns,
+        grantee = grantee_pubkey
+    );
+
+    create memory_audit(
+        agent_namespace = ns,
+        actor = signer,
+        action = "grant_access",
+        entry_id = "",
+        detail = "grantee=" + grantee_pubkey.to_hex()
+    );
+}
+
+operation revoke_access(namespace_name: text, grantee_pubkey: pubkey) {
+    val account = auth.authenticate();
+    val signer = op_context.get_signers()[0];
+    val ns = agent_namespace @ { .name == namespace_name };
+
+    require(ns.owner == signer, "Only namespace owner can revoke access");
+
+    delete access_grant @ { .agent_namespace == ns, .grantee == grantee_pubkey };
+
+    create memory_audit(
+        agent_namespace = ns,
+        actor = signer,
+        action = "revoke_access",
+        entry_id = "",
+        detail = "grantee=" + grantee_pubkey.to_hex()
+    );
+}
+
+operation admin_delete_namespace(namespace_name: text) {
+    val account = auth.authenticate();
+
+    require(
+        op_context.is_signer(chain_context.args.admin_pubkey),
+        "Only admin can force-delete namespaces"
+    );
+
+    val ns = agent_namespace @ { .name == namespace_name };
+
+    delete memory_tag @* { .memory_entry.agent_namespace == ns };
+    delete memory_embedding @* { .memory_entry.agent_namespace == ns };
+    delete memory_audit @* { .agent_namespace == ns };
+    delete access_grant @* { .agent_namespace == ns };
+    delete memory_entry @* { .agent_namespace == ns };
+    delete ns;
+}

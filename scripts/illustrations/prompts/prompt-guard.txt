@@ -1,0 +1,14 @@
+Use your built-in image_gen tool NOW to generate exactly one image. Do not ask for confirmation.
+
+Generate one standalone 16:9 horizontal illustration.
+
+Visual DNA: pure white background, minimalist black hand-drawn line art, slightly wobbly pen lines, lots of empty white space, sparse handwritten ENGLISH annotations in small red/orange/blue ink, clean absurd product-sketch feeling. No gradients, no shadows, no paper texture, no PPT infographic, no commercial vector, no cute mascot poster, no children illustration, no realistic UI.
+
+Recurring IP character required: a small generic robot agent, drawn in the same wobbly black pen OUTLINE (not solid fill): rounded rectangular head, two small dot eyes, one short antenna with a dot tip, simple boxy body, thin stick arms and legs, calm deadpan expression. Understated and generic, not cute, not expressive, not cartoon-animated. It must perform the core action, not decorate.
+
+Theme: risky actions are checked before they run.
+Core idea: every risky action must pass a checkpoint; it can be allowed, paused for a human, or blocked.
+Composition: the little robot acting as a deadpan gatekeeper at a small gate/turnstile, inspecting a parcel-like "action" before letting it through; one parcel waits, one is stamped through, one is stopped.
+Suggested elements: a small gate / a parcel labelled "action" / a stamp / a stop hand.
+English handwritten labels (ENGLISH, not Chinese): "allow" / "pause" / "block" / "checked first".
+Constraints: one core structure only, subject 40-60% of canvas, at least 35% blank white space, at most 6 short handwritten labels, no title in the top-left corner, strange but not childish.

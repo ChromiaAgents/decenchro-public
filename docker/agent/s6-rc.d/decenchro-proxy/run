@@ -1,0 +1,25 @@
+#!/command/with-contenv sh
+# shellcheck shell=sh
+# Single-port front door, only when the Hermes dashboard is exposed.
+#
+# With the dashboard off (the default, and every VM deploy today) this slot stays
+# down and agent-metrics.py owns the public port directly — byte-identical to the
+# behaviour before the proxy existed, so a proxy bug cannot take metrics down on
+# providers that never asked for the dashboard.
+case "${HERMES_DASHBOARD:-}" in
+    1|true|TRUE|True|yes|YES|Yes) ;;
+    *)
+        echo "[decenchro-proxy] HERMES_DASHBOARD unset — metrics owns the public port" >&2
+        exit 0
+        ;;
+esac
+
+export HOME=/opt/data
+# Same derivation decenchro-metrics/run uses, so the two cannot drift apart.
+# shellcheck source=../../ports.sh
+. "${DECENCHRO_PAYLOAD:-/opt/decenchro}/ports.sh"
+export DECENCHRO_PROXY_PORT="$DECENCHRO_PUBLIC_PORT"
+export METRICS_INTERNAL_PORT="$DECENCHRO_METRICS_PORT"
+
+cd /opt/data
+exec s6-setuidgid hermes node "${DECENCHRO_PAYLOAD:-/opt/decenchro}/proxy.mjs"

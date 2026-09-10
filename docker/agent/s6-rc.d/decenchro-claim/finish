@@ -1,0 +1,12 @@
+#!/command/with-contenv sh
+# shellcheck shell=sh
+# Companion to ./run. $1 is the run script's exit code.
+#
+# The watcher is one-shot by design: it exits 0 once the agent is claimed (or
+# once the give-up window elapses). A clean exit therefore means "done" and must
+# NOT be restarted — 125 is s6's permanent-failure marker. Any other exit code
+# is a crash, and we do want the supervised restart.
+case "${1:-0}" in
+    0) exit 125 ;;
+    *) exit 0 ;;
+esac

@@ -1,0 +1,371 @@
+@test module;
+
+import memory.{
+    create_namespace,
+    store_memory,
+    update_memory,
+    delete_memory,
+    grant_access,
+    get_namespace,
+    get_memory,
+    list_memories,
+    search_memories_by_tag,
+    count_memories,
+    get_audit_log,
+    get_public_namespaces,
+    get_namespace_embeddings
+};
+
+import lib.ft4.accounts;
+import lib.ft4.auth;
+import lib.ft4.test.core.accounts.{ create_auth_descriptor };
+import lib.ft4.test.core.auth.{ ft_auth_operation_for };
+import open_strategy: lib.ft4.core.accounts.strategies.open;
+import lib.ft4.external.accounts.strategies.{ register_account };
+
+// Dummy embedding vector for tests. store_memory creates a memory_embedding
+// row from it; get_namespace_embeddings reads it back.
+val TEST_VECTOR = "[0.1,0.2,0.3]";
+
+function register_test_account(kp: rell.test.keypair) {
+    val ad = create_auth_descriptor(kp.pub, ["A", "T"]);
+    rell.test.tx()
+        .op(open_strategy.ras_open(ad))
+        .op(register_account())
+        .sign(kp)
+        .run();
+}
+
+function test_create_namespace() {
+    val alice = rell.test.keypairs.alice;
+    register_test_account(alice);
+
+    rell.test.tx()
+        .op(ft_auth_operation_for(alice.pub))
+        .op(create_namespace("alice-memories", "private"))
+        .sign(alice)
+        .run();
+
+    val ns = get_namespace("alice-memories");
+    assert_equals(ns.name, "alice-memories");
+    assert_equals(ns.read_policy, "private");
+    assert_equals(ns.memory_count, 0);
+}
+
+function test_store_and_recall_memory() {
+    val alice = rell.test.keypairs.alice;
+    register_test_account(alice);
+
+    rell.test.tx()
+        .op(ft_auth_operation_for(alice.pub))
+        .op(create_namespace("alice-mem", "private"))
+        .sign(alice)
+        .run();
+
+    rell.test.tx()
+        .op(ft_auth_operation_for(alice.pub))
+        .op(store_memory(
+            "alice-mem",
+            "mem-001",
+            "User prefers concise responses",
+            "correction",
+            "preference,style",
+            90,
+            TEST_VECTOR
+        ))
+        .sign(alice)
+        .run();
+
+    val mem = get_memory("alice-mem", "mem-001", alice.pub);
+    assert_equals(mem.content, "User prefers concise responses");
+    assert_equals(mem.source, "correction");
+    assert_equals(mem.confidence, 90);
+    assert_equals(mem.tags, "preference,style");
+}
+
+function test_update_memory() {
+    val alice = rell.test.keypairs.alice;
+    register_test_account(alice);
+
+    rell.test.tx()
+        .op(ft_auth_operation_for(alice.pub))
+        .op(create_namespace("alice-upd", "private"))
+        .sign(alice)
+        .run();
+
+    rell.test.tx()
+        .op(ft_auth_operation_for(alice.pub))
+        .op(store_memory("alice-upd", "mem-002", "Initial fact", "observation", "test", 50, TEST_VECTOR))
+        .sign(alice)
+        .run();
+
+    rell.test.tx()
+        .op(ft_auth_operation_for(alice.pub))
+        .op(update_memory("alice-upd", "mem-002", "Updated fact with more detail", "test,updated", 85, TEST_VECTOR))
+        .sign(alice)
+        .run();
+
+    val mem = get_memory("alice-upd", "mem-002", alice.pub);
+    assert_equals(mem.content, "Updated fact with more detail");
+    assert_equals(mem.confidence, 85);
+    assert_equals(mem.tags, "test,updated");
+}
+
+function test_delete_memory() {
+    val alice = rell.test.keypairs.alice;
+    register_test_account(alice);
+
+    rell.test.tx()
+        .op(ft_auth_operation_for(alice.pub))
+        .op(create_namespace("alice-del", "private"))
+        .sign(alice)
+        .run();
+
+    rell.test.tx()
+        .op(ft_auth_operation_for(alice.pub))
+        .op(store_memory("alice-del", "mem-003", "Temporary info", "conversation", "temp", 30, TEST_VECTOR))
+        .sign(alice)
+        .run();
+
+    assert_equals(count_memories("alice-del", alice.pub), 1);
+
+    rell.test.tx()
+        .op(ft_auth_operation_for(alice.pub))
+        .op(delete_memory("alice-del", "mem-003"))
+        .sign(alice)
+        .run();
+
+    assert_equals(count_memories("alice-del", alice.pub), 0);
+}
+
+function test_search_by_tag() {
+    val alice = rell.test.keypairs.alice;
+    register_test_account(alice);
+
+    rell.test.tx()
+        .op(ft_auth_operation_for(alice.pub))
+        .op(create_namespace("alice-tag", "private"))
+        .sign(alice)
+        .run();
+
+    rell.test.tx()
+        .op(ft_auth_operation_for(alice.pub))
+        .op(store_memory("alice-tag", "t-001", "Likes TypeScript", "observation", "preference,language", 80, TEST_VECTOR))
+        .sign(alice)
+        .run();
+
+    rell.test.tx()
+        .op(ft_auth_operation_for(alice.pub))
+        .op(store_memory("alice-tag", "t-002", "Works at Acme Corp", "conversation", "work,company", 95, TEST_VECTOR))
+        .sign(alice)
+        .run();
+
+    val prefs = search_memories_by_tag("alice-tag", "preference", alice.pub);
+    assert_equals(prefs.size(), 1);
+    assert_equals(prefs[0].entry_id, "t-001");
+
+    val work = search_memories_by_tag("alice-tag", "work", alice.pub);
+    assert_equals(work.size(), 1);
+    assert_equals(work[0].entry_id, "t-002");
+}
+
+// A tag search must match whole tags only — "lang" must not match "language".
+function test_search_by_tag_exact_match() {
+    val alice = rell.test.keypairs.alice;
+    register_test_account(alice);
+
+    rell.test.tx()
+        .op(ft_auth_operation_for(alice.pub))
+        .op(create_namespace("alice-exact", "private"))
+        .sign(alice)
+        .run();
+
+    rell.test.tx()
+        .op(ft_auth_operation_for(alice.pub))
+        .op(store_memory("alice-exact", "e-001", "Likes TypeScript", "observation", "language", 80, TEST_VECTOR))
+        .sign(alice)
+        .run();
+
+    val partial = search_memories_by_tag("alice-exact", "lang", alice.pub);
+    assert_equals(partial.size(), 0);
+
+    val exact = search_memories_by_tag("alice-exact", "language", alice.pub);
+    assert_equals(exact.size(), 1);
+    assert_equals(exact[0].entry_id, "e-001");
+}
+
+function test_access_control_shared() {
+    val alice = rell.test.keypairs.alice;
+    val bob = rell.test.keypairs.bob;
+    register_test_account(alice);
+    register_test_account(bob);
+
+    rell.test.tx()
+        .op(ft_auth_operation_for(alice.pub))
+        .op(create_namespace("shared-knowledge", "shared"))
+        .sign(alice)
+        .run();
+
+    rell.test.tx()
+        .op(ft_auth_operation_for(alice.pub))
+        .op(store_memory("shared-knowledge", "sk-001", "Important finding", "observation", "shared", 90, TEST_VECTOR))
+        .sign(alice)
+        .run();
+
+    rell.test.tx()
+        .op(ft_auth_operation_for(alice.pub))
+        .op(grant_access("shared-knowledge", bob.pub))
+        .sign(alice)
+        .run();
+
+    val mem = get_memory("shared-knowledge", "sk-001", bob.pub);
+    assert_equals(mem.content, "Important finding");
+}
+
+function test_audit_log() {
+    val alice = rell.test.keypairs.alice;
+    register_test_account(alice);
+
+    rell.test.tx()
+        .op(ft_auth_operation_for(alice.pub))
+        .op(create_namespace("alice-audit", "private"))
+        .sign(alice)
+        .run();
+
+    rell.test.tx()
+        .op(ft_auth_operation_for(alice.pub))
+        .op(store_memory("alice-audit", "a-001", "First memory", "conversation", "test", 70, TEST_VECTOR))
+        .sign(alice)
+        .run();
+
+    val log = get_audit_log("alice-audit", alice.pub, 10);
+    assert_true(log.size() >= 2);
+}
+
+function test_list_memories_pagination() {
+    val alice = rell.test.keypairs.alice;
+    register_test_account(alice);
+
+    rell.test.tx()
+        .op(ft_auth_operation_for(alice.pub))
+        .op(create_namespace("alice-page", "private"))
+        .sign(alice)
+        .run();
+
+    rell.test.tx()
+        .op(ft_auth_operation_for(alice.pub))
+        .op(store_memory("alice-page", "p-001", "Memory one", "conversation", "test", 70, TEST_VECTOR))
+        .sign(alice)
+        .run();
+
+    rell.test.tx()
+        .op(ft_auth_operation_for(alice.pub))
+        .op(store_memory("alice-page", "p-002", "Memory two", "conversation", "test", 80, TEST_VECTOR))
+        .sign(alice)
+        .run();
+
+    rell.test.tx()
+        .op(ft_auth_operation_for(alice.pub))
+        .op(store_memory("alice-page", "p-003", "Memory three", "conversation", "test", 90, TEST_VECTOR))
+        .sign(alice)
+        .run();
+
+    val page1 = list_memories("alice-page", alice.pub, 2, 0);
+    assert_equals(page1.size(), 2);
+
+    val page2 = list_memories("alice-page", alice.pub, 2, 2);
+    assert_equals(page2.size(), 1);
+}
+
+function test_get_public_namespaces_pagination() {
+    val alice = rell.test.keypairs.alice;
+    register_test_account(alice);
+
+    for (i in range(3)) {
+        rell.test.tx()
+            .op(ft_auth_operation_for(alice.pub))
+            .op(create_namespace("public-ns-" + i, "public"))
+            .sign(alice)
+            .run();
+    }
+
+    val page1 = get_public_namespaces(2, 0);
+    assert_equals(page1.size(), 2);
+
+    val page2 = get_public_namespaces(2, 2);
+    assert_equals(page2.size(), 1);
+}
+
+// store_memory dedups on exact content: storing the same content again
+// refreshes the existing entry (tags/confidence) instead of creating a copy.
+function test_store_dedup() {
+    val alice = rell.test.keypairs.alice;
+    register_test_account(alice);
+
+    rell.test.tx()
+        .op(ft_auth_operation_for(alice.pub))
+        .op(create_namespace("alice-dedup", "private"))
+        .sign(alice)
+        .run();
+
+    rell.test.tx()
+        .op(ft_auth_operation_for(alice.pub))
+        .op(store_memory("alice-dedup", "d-001", "User prefers dark mode", "observation", "preference", 70, TEST_VECTOR))
+        .sign(alice)
+        .run();
+
+    // Same content, different entry_id/tags/confidence — should refresh d-001.
+    rell.test.tx()
+        .op(ft_auth_operation_for(alice.pub))
+        .op(store_memory("alice-dedup", "d-002", "User prefers dark mode", "correction", "preference,ui", 95, TEST_VECTOR))
+        .sign(alice)
+        .run();
+
+    assert_equals(count_memories("alice-dedup", alice.pub), 1);
+
+    val mem = get_memory("alice-dedup", "d-001", alice.pub);
+    assert_equals(mem.confidence, 95);
+    assert_equals(mem.tags, "preference,ui");
+
+    // d-002 was never created.
+    assert_fails(get_memory("alice-dedup", "d-002", alice.pub, *));
+}
+
+// get_namespace_embeddings hands the client every stored embedding so it can
+// cosine-rank locally. It returns only memories that have an embedding, and
+// enforces read access.
+function test_get_namespace_embeddings() {
+    val alice = rell.test.keypairs.alice;
+    register_test_account(alice);
+
+    rell.test.tx()
+        .op(ft_auth_operation_for(alice.pub))
+        .op(create_namespace("alice-emb", "private"))
+        .sign(alice)
+        .run();
+
+    // Two memories with embeddings, one without.
+    rell.test.tx()
+        .op(ft_auth_operation_for(alice.pub))
+        .op(store_memory("alice-emb", "e-001", "First memory", "observation", "test", 70, TEST_VECTOR))
+        .sign(alice)
+        .run();
+    rell.test.tx()
+        .op(ft_auth_operation_for(alice.pub))
+        .op(store_memory("alice-emb", "e-002", "Second memory", "observation", "test", 80, TEST_VECTOR))
+        .sign(alice)
+        .run();
+    rell.test.tx()
+        .op(ft_auth_operation_for(alice.pub))
+        .op(store_memory("alice-emb", "e-003", "No embedding", "observation", "test", 60, ""))
+        .sign(alice)
+        .run();
+
+    val embeddings = get_namespace_embeddings("alice-emb", alice.pub);
+    assert_equals(embeddings.size(), 2);
+    assert_equals(embeddings[0].vector, TEST_VECTOR);
+
+    // A reader with no access to the private namespace is rejected.
+    val stranger = rell.test.keypairs.bob;
+    assert_fails(get_namespace_embeddings("alice-emb", stranger.pub, *));
+}

@@ -1,0 +1,55 @@
+#!/command/with-contenv sh
+# shellcheck shell=sh
+# Readiness beacon: reports `ready` to the console once the agent is actually
+# serving, then retires.
+#
+# The gateway runs as the container's CMD (s6-overlay's "main program"), not as a
+# supervised service, so there is no service slot to depend on. Polling the
+# metrics endpoint is the least-coupled readiness signal available, and it is the
+# same thing the console itself polls — so a green beacon means the console will
+# genuinely see the agent.
+if [ -z "${DEPLOY_WEBHOOK_URL:-}" ] || [ -z "${DEPLOYMENT_ID:-}" ]; then
+    exit 0
+fi
+
+# Front door, which is the proxy when the dashboard is enabled and the metrics
+# server otherwise — see ports.sh. Deriving it here independently is how this
+# beacon ended up able to poll a closed port and report a healthy agent failed.
+# shellcheck source=../../ports.sh
+. "${DECENCHRO_PAYLOAD:-/opt/decenchro}/ports.sh"
+port="$DECENCHRO_FRONT_PORT"
+
+# ~2 min ceiling. Deliberately longer than a healthy boot needs: reporting
+# `failed` on a slow-but-fine start would tear down a working agent.
+i=0
+up=0
+while [ "$i" -lt 60 ]; do
+    if curl -sf --max-time 2 "http://127.0.0.1:${port}/health" >/dev/null 2>&1; then
+        up=1
+        break
+    fi
+    i=$((i + 1))
+    sleep 2
+done
+
+if [ "$up" = 1 ]; then
+    status=ready
+    echo "[decenchro-ready] metrics endpoint up after ~$((i * 2))s"
+else
+    status=failed
+    echo "[decenchro-ready] metrics endpoint never came up — reporting failed" >&2
+fi
+
+# 3 attempts: this is the single callback that flips the console from
+# provisioning to running, so a transient network blip must not lose it.
+n=0
+while [ "$n" -lt 3 ]; do
+    curl -sf -X POST --max-time 10 \
+        "${DEPLOY_WEBHOOK_URL}?id=${DEPLOYMENT_ID}&status=${status}&token=${DEPLOY_WEBHOOK_TOKEN:-}" \
+        >/dev/null 2>&1 && break
+    n=$((n + 1))
+    sleep 10
+done
+
+# Done for the life of this container; ./finish keeps s6 from restarting us.
+exit 0

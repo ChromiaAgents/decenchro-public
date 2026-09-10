@@ -1,0 +1,114 @@
+:root {
+  --p2m-duration: 900ms;
+  --p2m-ease-enter: cubic-bezier(0, 0, 0.2, 1);
+  --p2m-ease-settle: cubic-bezier(0.4, 0, 0.2, 1);
+  --p2m-ease-narrative: cubic-bezier(0.34, 0, 0.14, 1);
+  --accent: #0e7569;
+  --surface: #f2eee8;
+  --text-primary: #2f2c27;
+  --text-secondary: #6d665c;
+  --text-tertiary: #9b9287;
+}
+
+#logo-lockup,
+#mark,
+#ledger-tile,
+#connector,
+#memory-square,
+#wordmark {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+#ledger-tile {
+  animation: p2m-tile var(--p2m-duration) var(--p2m-ease-narrative) both;
+}
+
+#connector {
+  stroke-dasharray: 1 1;
+  stroke-dashoffset: 1;
+  animation: p2m-draw var(--p2m-duration) var(--p2m-ease-enter) both;
+}
+
+#memory-square {
+  stroke-dasharray: 1 1;
+  stroke-dashoffset: 1;
+  animation: p2m-square var(--p2m-duration) var(--p2m-ease-enter) both;
+}
+
+#wordmark {
+  animation: p2m-word var(--p2m-duration) var(--p2m-ease-settle) both;
+}
+
+@keyframes p2m-tile {
+  0% {
+    opacity: 0;
+    transform: translate(10px, 8px) scale(0.96);
+  }
+  20% {
+    opacity: 0;
+    transform: translate(10px, 8px) scale(0.94);
+    animation-timing-function: cubic-bezier(0.34, 0, 0.14, 1); /* --p2m-ease-narrative */
+  }
+  64% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1); /* --p2m-ease-settle */
+  }
+  100% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+}
+
+@keyframes p2m-draw {
+  0%, 28% {
+    opacity: 1;
+    stroke-dashoffset: 1;
+  }
+  72% {
+    stroke-dashoffset: 0;
+    animation-timing-function: cubic-bezier(0, 0, 0.2, 1); /* --p2m-ease-enter */
+  }
+  100% {
+    opacity: 1;
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes p2m-square {
+  0%, 36% {
+    opacity: 1;
+    stroke-dashoffset: 1;
+    transform: translate(-3px, 3px);
+  }
+  78% {
+    stroke-dashoffset: 0;
+    transform: translate(0, 0);
+    animation-timing-function: cubic-bezier(0, 0, 0.2, 1); /* --p2m-ease-enter */
+  }
+  100% {
+    opacity: 1;
+    stroke-dashoffset: 0;
+    transform: translate(0, 0);
+  }
+}
+
+@keyframes p2m-word {
+  0%, 32% {
+    opacity: 0;
+    clip-path: inset(0 100% 0 0);
+    transform: translateX(-8px);
+  }
+  82% {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+    transform: translateX(0);
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1); /* --p2m-ease-settle */
+  }
+  100% {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+    transform: translateX(0);
+  }
+}

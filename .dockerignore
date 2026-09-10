@@ -1,0 +1,15 @@
+# The agent image builds from the repo root (it needs agent/plugins + docker/agent),
+# so keep the build context small — without this, node_modules, .next and the
+# demo videos all get shipped to the daemon on every build.
+.git
+.next
+node_modules
+**/node_modules
+*.mp4
+.env
+.env.*
+.vercel
+videos
+public/illustrations
+chain
+supabase/.branches

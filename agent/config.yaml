@@ -1,0 +1,88 @@
+# Decenchro — Hermes Agent Configuration
+# Copy to ~/.hermes/config.yaml after running setup
+
+model:
+  provider: "openrouter"
+  default: "openai/gpt-5.4-mini"
+
+# Context compression to manage long sessions
+compression:
+  enabled: true
+  threshold: 0.50
+  target_ratio: 0.20
+  protect_last_n: 20
+  summary_model: "openai/gpt-5.4-mini"
+  summary_provider: "openrouter"
+
+# Agent behavior
+agent:
+  max_turns: 90
+  reasoning_effort: ""
+  tool_use_enforcement: "auto"
+
+# Memory — local Hermes memory (on-chain memory via Chromia skill)
+memory:
+  memory_enabled: true
+  user_profile_enabled: true
+  memory_char_limit: 2200
+  user_char_limit: 1375
+
+# Terminal backend
+terminal:
+  backend: local
+  cwd: "."
+  timeout: 180
+  persistent_shell: true
+
+# Telegram settings
+telegram:
+  require_mention: true
+  mention_patterns:
+    - "^\\s*decenchro\\b"
+
+# Group sessions — each user gets their own context
+group_sessions_per_user: true
+
+# Unauthorized DMs — require pairing
+unauthorized_dm_behavior: pair
+
+# Display
+display:
+  tool_progress: all
+  compact: false
+  streaming: false
+  show_cost: false
+
+# Security
+security:
+  redact_secrets: true
+
+# Plugins — opt-in allowlist. Hermes discovers plugin directories in
+# ~/.hermes/plugins/ but only registers hooks for names listed here.
+# decenchro-guard routes tool calls through the Atbash judge before they run.
+# Uncomment after running `npm install` in the plugin dir and setting
+# ATBASH_AGENT_KEY in ~/.hermes/.env.
+plugins:
+  enabled:
+    # - decenchro-guard
+
+# Streaming for messaging platforms
+streaming:
+  enabled: true
+  transport: edit
+  edit_interval: 0.3
+  buffer_threshold: 40
+  cursor: " ..."
+
+# Approvals — smart mode for autonomous operation
+approvals:
+  mode: smart
+
+# Provider routing — prefer Anthropic backends on OpenRouter
+provider_routing:
+  sort: "throughput"
+
+# Fallback model
+fallback_model:
+  provider: openrouter
+  model: openai/gpt-5.4-mini

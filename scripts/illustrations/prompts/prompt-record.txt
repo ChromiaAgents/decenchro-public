@@ -1,0 +1,15 @@
+Use your built-in image_gen tool NOW to generate exactly one image. Do not ask for confirmation.
+
+Generate one standalone 16:9 horizontal illustration.
+
+Visual DNA: pure white background, minimalist black hand-drawn line art, slightly wobbly pen lines, lots of empty white space, sparse handwritten ENGLISH annotations in small red/orange/blue ink, clean absurd product-sketch feeling. No gradients, no shadows, no paper texture, no PPT infographic, no commercial vector, no cute mascot poster, no children illustration, no realistic UI.
+
+Recurring IP character required: a small generic robot agent, drawn in the same wobbly black pen OUTLINE (not solid fill): rounded rectangular head, two small dot eyes, one short antenna with a dot tip, simple boxy body, thin stick arms and legs, calm deadpan expression. Understated and generic, not cute, not expressive, not cartoon-animated. It must perform the core action, not decorate.
+
+Theme: a tamper-proof memory/record for an AI agent.
+Core idea: everything the agent does gets written into a permanent record that nobody can secretly change.
+Composition: the little robot carefully locking entries into a stack of record cards chained shut; an entry already written cannot be erased.
+Suggested elements: stack of record cards / a chain / a small padlock / a pen.
+English handwritten labels (use ENGLISH, not Chinese): "saved" / "can't edit" / "remembered".
+
+Constraints: one core structure only, subject 40-60% of canvas, at least 35% blank white space, at most 6 short handwritten labels, no title in the top-left corner, clean but not instructional, strange but not childish.

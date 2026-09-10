@@ -1,0 +1,111 @@
+# Decenchro agent config. Seeded into $HERMES_HOME/config.yaml on first boot by
+# /etc/cont-init.d/20-decenchro-config, which substitutes __MODEL_ID__ and then
+# never touches the file again — so an operator's later edits survive restarts
+# and image upgrades.
+
+# Latest migration target in the pinned base image (hermes_cli/config_migrations.py).
+# Without it Hermes treats the file as pre-v12, prints a "can no longer be
+# auto-migrated" warning, and leaves it untouched. Stamping the current version
+# also means a future base-image bump applies only the migrations newer than this.
+_config_version: 39
+
+model:
+  provider: "openrouter"
+  default: "__MODEL_ID__"
+
+compression:
+  enabled: true
+  threshold: 0.50
+  target_ratio: 0.20
+  protect_last_n: 20
+  summary_model: "google/gemini-3.5-flash"
+  summary_provider: "openrouter"
+
+agent:
+  max_turns: 90
+  tool_use_enforcement: "auto"
+  # The Chromium shell and its X11/font/mesa stack are stripped from the image
+  # (docker/agent/slim.sh: ~430 MB unpacked). Leaving the toolset advertised
+  # would let the model pick browser_navigate and get a launch failure instead
+  # of a refusal, so it is turned off where the tools are chosen, not just
+  # deleted from disk. web_search / web_extract are unaffected.
+  disabled_toolsets:
+    - browser
+
+memory:
+  memory_enabled: true
+  user_profile_enabled: true
+  memory_char_limit: 2200
+  user_char_limit: 1375
+
+terminal:
+  backend: local
+  cwd: "/opt/data/workspace"
+  timeout: 180
+  persistent_shell: true
+
+telegram:
+  require_mention: true
+  mention_patterns:
+    - "^\\s*decenchro\\b"
+
+# No "⚕ Hermes Agent / ────" header on every WhatsApp reply (the bridge's
+# default). Empty string = no prefix; unset would mean the default.
+whatsapp:
+  reply_prefix: ""
+  # DMs are open because WHATSAPP_ALLOW_ALL_USERS authorises every sender
+  # anyway (see lib/dashboard/deploy.ts); leaving this at the default
+  # "pairing" would only make the gateway offer a code it then ignores.
+  dm_policy: open
+
+group_sessions_per_user: true
+unauthorized_dm_behavior: pair
+
+# Skip the built-in "shall I build a profile of you?" opener on first contact.
+# Quoted deliberately: PyYAML reads a bare off as boolean false, and Hermes
+# only honours the string "off".
+onboarding:
+  profile_build: "off"
+
+# decenchro-guard — routes every guarded tool call through the Atbash judge
+# before it runs, and signs it on-chain. Without this the agent never records a
+# single action, so the console's Fleet/Analytics stay empty.
+plugins:
+  enabled:
+    - decenchro-guard
+    # Dashboard password login. The auth gate engages on any non-loopback bind
+    # and fails closed unless a DashboardAuthProvider is registered, and this
+    # provider ships as a plugin — so leaving it out of this list means the
+    # dashboard refuses to start rather than starting unauthenticated. Harmless
+    # when HERMES_DASHBOARD is unset: nothing asks for a provider.
+    - basic
+
+# Console material. The theme file itself is seeded by cont-init into
+# $HERMES_HOME/dashboard-themes/ from docker/agent/dashboard-theme.yaml.
+dashboard:
+  theme: decenchro
+
+display:
+  # CLI/TUI skin (the console's Chat tab is the TUI). Seeded by cont-init from
+  # docker/agent/skin.yaml into $HERMES_HOME/skins/.
+  skin: decenchro
+  tool_progress: all
+  compact: false
+  streaming: false
+
+security:
+  redact_secrets: true
+
+streaming:
+  enabled: true
+  transport: edit
+  edit_interval: 0.3
+  buffer_threshold: 40
+  cursor: " ..."
+
+approvals:
+  mode: smart
+
+fallback_model:
+  provider: openrouter
+  model: google/gemini-3.5-flash

@@ -1,0 +1,23 @@
+{
+  "name": "decenchro-guard-shim",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Node shim that bridges the Hermes Python plugin to the Atbash SDK.",
+  "type": "module",
+  "bin": {
+    "decenchro-guard-judge": "bin/judge.mjs"
+  },
+  "dependencies": {
+    "@atbash/sdk": "^0.3.25"
+  },
+  "comment:overrides": "Patch transitive deps flagged by Dependabot (axios/form-data via postchain-client, protobufjs/@opentelemetry via the SDK metrics exporter). Same-major bumps; no @atbash/sdk downgrade.",
+  "overrides": {
+    "axios": "1.18.1",
+    "form-data": "4.0.6",
+    "protobufjs": "8.6.5",
+    "@opentelemetry/core": "2.8.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

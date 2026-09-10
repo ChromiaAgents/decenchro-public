@@ -1,0 +1,29 @@
+{
+  "name": "decenchro-client",
+  "version": "0.1.0",
+  "description": "TypeScript bridge for Hermes Agent to Chromia on-chain memory",
+  "type": "module",
+  "scripts": {
+    "store": "tsx src/cli.ts store",
+    "recall": "tsx src/cli.ts recall",
+    "list": "tsx src/cli.ts list",
+    "search": "tsx src/cli.ts search",
+    "namespace": "tsx src/cli.ts namespace",
+    "audit": "tsx src/cli.ts audit"
+  },
+  "dependencies": {
+    "postchain-client": "^1.0.0",
+    "@chromia/ft4": "^1.0.0",
+    "dotenv": "^16.4.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.0.0",
+    "typescript": "^5.5.0",
+    "@types/node": "^22.0.0"
+  },
+  "comment:overrides": "Patch transitive deps flagged by Dependabot: ws via postchain-client/@chromia, esbuild via tsx (dev). Same-major bumps.",
+  "overrides": {
+    "ws": "8.21.0",
+    "esbuild": "0.28.1"
+  }
+}

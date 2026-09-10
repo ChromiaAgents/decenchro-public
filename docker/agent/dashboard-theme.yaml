@@ -1,0 +1,47 @@
+# Decenchro theme for the Hermes web console. Seeded by cont-init into
+# $HERMES_HOME/dashboard-themes/decenchro.yaml on every boot (it is ours, not
+# the operator's) and selected by `dashboard.theme` in config.yaml.tmpl.
+# Schema: hermes_cli/web_server.py::_normalise_theme_definition. `background`
+# is the page, `midground` is the ink/primary, `foreground` the glow layer.
+# Same material as /dashboard: warm canvas, teal-only signal, 10px radius.
+name: decenchro
+label: Decenchro
+description: Warm canvas, teal signal. The Decenchro console material.
+palette:
+  background: "#faf8f5"
+  midground: "#131311"
+  foreground:
+    hex: "#ffffff"
+    alpha: 0
+  warmGlow: "rgba(14, 117, 105, 0.10)"
+  noiseOpacity: 0
+typography:
+  fontSans: '"Helvetica Neue", Helvetica, Arial, system-ui, sans-serif'
+  fontDisplay: '"Helvetica Neue", Helvetica, Arial, system-ui, sans-serif'
+  fontMono: '"JetBrains Mono", ui-monospace, Menlo, Consolas, monospace'
+  fontUrl: "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap"
+  baseSize: "15px"
+  lineHeight: "1.55"
+layout:
+  radius: "10px"
+  density: comfortable
+colorOverrides:
+  primary: "#0e7569"
+  primaryForeground: "#ffffff"
+  accent: "#0e7569"
+  accentForeground: "#ffffff"
+  card: "#ffffff"
+  cardForeground: "#131311"
+  popover: "#ffffff"
+  popoverForeground: "#131311"
+  secondary: "#f0ede6"
+  secondaryForeground: "#131311"
+  muted: "#f0ede6"
+  mutedForeground: "#726f66"
+  border: "#e7e2d8"
+  input: "#e7e2d8"
+  ring: "#0e7569"
+  success: "#0e7569"
+  warning: "#b7791f"
+  destructive: "#b42318"
+  destructiveForeground: "#ffffff"

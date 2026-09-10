@@ -1,0 +1,21 @@
+@mount("memory")
+module;
+
+import lib.ft4.auth;
+
+struct module_args {
+    admin_pubkey: pubkey;
+}
+
+// Default auth handler — all memory operations require Transfer flag
+@extend(auth.auth_handler)
+function () = auth.add_auth_handler(
+    flags = ["T"]
+);
+
+// Admin operations require Admin flag
+@extend(auth.auth_handler)
+function () = auth.add_auth_handler(
+    scope = rell.meta(admin_delete_namespace).mount_name,
+    flags = ["A"]
+);

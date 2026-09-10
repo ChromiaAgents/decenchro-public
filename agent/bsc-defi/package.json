@@ -1,0 +1,19 @@
+{
+  "name": "bsc-defi",
+  "private": true,
+  "version": "0.1.0",
+  "description": "BSC DeFi CLI for Decenchro agents: PancakeSwap v2/v3 + Venus on BNB Chain, dry-run by default, one write chain per invocation.",
+  "type": "module",
+  "bin": {
+    "bsc-defi": "bin/bsc-defi.mjs"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "viem": "^2.21.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

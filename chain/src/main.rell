@@ -1,0 +1,5 @@
+module;
+
+import memory;
+import lib.ft4.core.accounts.strategies.open;
+import lib.ft4.external.accounts.strategies;

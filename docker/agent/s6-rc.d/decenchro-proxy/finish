@@ -1,0 +1,10 @@
+#!/command/with-contenv sh
+# shellcheck shell=sh
+# Companion to ./run. A clean exit 0 only happens when HERMES_DASHBOARD is unset,
+# which is a permanent decision for this container — 125 tells s6 not to restart
+# and to report the slot down. A crash (non-zero) is worth retrying, since the
+# public port going away would take metrics and the health check with it.
+case "${1:-0}" in
+    0) exit 125 ;;
+    *) exit 0 ;;
+esac

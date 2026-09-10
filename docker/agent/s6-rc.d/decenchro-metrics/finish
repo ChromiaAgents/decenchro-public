@@ -1,0 +1,13 @@
+#!/command/with-contenv sh
+# shellcheck shell=sh
+# Companion to ./run. When METRICS_TOKEN is unset, run exits 0 immediately and
+# s6-supervise would otherwise restart it in a tight loop. 125 is s6's
+# "permanent failure, do not restart" marker, so the slot reports down and
+# s6-svstat reflects reality.
+#
+# When the token IS set, a run exit means the endpoint crashed and we want the
+# supervised restart — exit non-125.
+if [ -z "${METRICS_TOKEN:-}" ]; then
+    exit 125
+fi
+exit 0

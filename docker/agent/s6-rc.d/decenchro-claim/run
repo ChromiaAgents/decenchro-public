@@ -1,0 +1,18 @@
+#!/command/with-contenv sh
+# shellcheck shell=sh
+# First-message owner claim (trust-on-first-use).
+#
+# Nobody has a shell on a tenant box, so Hermes' normal pairing flow
+# (`hermes pairing approve …`, run locally) can never be completed. This watcher
+# promotes the FIRST Telegram user who messages the bot to the approved list,
+# then exits — everyone after them stays gated.
+if [ -z "${TELEGRAM_BOT_TOKEN:-}" ]; then
+    echo "[decenchro-claim] TELEGRAM_BOT_TOKEN unset — claim watcher disabled" >&2
+    exit 0
+fi
+
+export HOME=/opt/data
+export HERMES_HOME="${HERMES_HOME:-/opt/data}"
+
+cd /opt/data
+exec s6-setuidgid hermes python3 "${DECENCHRO_PAYLOAD:-/opt/decenchro}/decenchro-claim.py"

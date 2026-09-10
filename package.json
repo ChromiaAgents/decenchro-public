@@ -1,0 +1,47 @@
+{
+  "name": "decenchro-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "dev:all": "./dev-local.sh start",
+    "dev:stop": "./dev-local.sh stop",
+    "dev:status": "./dev-local.sh status",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "migrate": "node scripts/migrate.mjs"
+  },
+  "dependencies": {
+    "@atbash/sdk": "^0.3.24",
+    "@neondatabase/auth": "^0.5.0-beta",
+    "drizzle-orm": "^0.45.2",
+    "framer-motion": "^12.0.0",
+    "next": "^16.2.9",
+    "postgres": "^3.4.9",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "stripe": "^22.3.1",
+    "viem": "^2.55.19"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.2.2",
+    "@types/node": "22.10.2",
+    "@types/react": "19.0.2",
+    "@types/react-dom": "19.0.2",
+    "drizzle-kit": "^0.31.10",
+    "postcss": "^8.5.15",
+    "tailwindcss": "^4.2.2",
+    "typescript": "5.7.2"
+  },
+  "comment:overrides": "Force patched versions of transitive deps flagged by Dependabot (axios/form-data via @atbash/sdk→postchain-client, protobufjs via @opentelemetry, postcss nested in next/tailwind). All same-major as installed — no @atbash/sdk downgrade.",
+  "overrides": {
+    "axios": "1.18.1",
+    "form-data": "4.0.6",
+    "protobufjs": "8.6.5",
+    "postcss": "^8.5.15",
+    "@opentelemetry/core": "2.8.0"
+  }
+}

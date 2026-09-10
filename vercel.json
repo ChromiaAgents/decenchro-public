@@ -1,0 +1,32 @@
+{
+  "cleanUrls": true,
+  "crons": [
+    {
+      "path": "/api/agents/enforce-budgets",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/agents/attest",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/credits/meter",
+      "schedule": "*/10 * * * *"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        }
+      ]
+    }
+  ]
+}

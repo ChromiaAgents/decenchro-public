@@ -1,0 +1,6 @@
+.env
+node_modules/
+build/
+lib/
+client/dist/
+*.js.map

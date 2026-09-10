@@ -1,0 +1,14 @@
+Use your built-in image_gen tool NOW to generate exactly one image. Do not ask for confirmation.
+
+Generate one standalone 16:9 horizontal illustration.
+
+Visual DNA: pure white background, minimalist black hand-drawn line art, slightly wobbly pen lines, lots of empty white space, sparse handwritten ENGLISH annotations in small red/orange/blue ink, clean absurd product-sketch feeling. No gradients, no shadows, no paper texture, no PPT infographic, no commercial vector, no cute mascot poster, no children illustration, no realistic UI.
+
+Recurring IP character required: a small generic robot agent, drawn in the same wobbly black pen OUTLINE (not solid fill): rounded rectangular head, two small dot eyes, one short antenna with a dot tip, simple boxy body, thin stick arms and legs, calm deadpan expression. Understated and generic, not cute, not expressive, not cartoon-animated. It must perform the core action, not decorate.
+
+Theme: from one agent to a whole team, all following the same rules.
+Core idea: many agents run on their own servers but all answer to one shared rulebook and one record.
+Composition: the little robot as a calm conductor holding one rulebook, while several smaller identical little robots each sit on their own little server box and look toward the rulebook; thin lines connect them to one shared record.
+Suggested elements: one rulebook / several little server boxes / small identical robots / one shared record sheet.
+English handwritten labels (ENGLISH, not Chinese): "same rules" / "every agent" / "one record".
+Constraints: one core structure only, subject 40-60% of canvas, at least 35% blank white space, at most 6 short handwritten labels, no title in the top-left corner, strange but not childish.

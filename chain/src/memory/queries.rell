@@ -1,0 +1,250 @@
+struct memory_dto {
+    entry_id: text;
+    namespace_name: text;
+    content: text;
+    source: text;
+    tags: text;
+    confidence: integer;
+    created_at: timestamp;
+    updated_at: timestamp;
+}
+
+struct namespace_dto {
+    name: text;
+    owner: pubkey;
+    read_policy: text;
+    memory_count: integer;
+    created_at: timestamp;
+}
+
+// One memory's embedding — returned by get_namespace_embeddings so the client
+// can cosine-rank locally without pulling full memory content.
+struct embedding_dto {
+    entry_id: text;
+    vector: text;
+}
+
+struct audit_dto {
+    actor: pubkey;
+    action: text;
+    entry_id: text;
+    detail: text;
+    created_at: timestamp;
+}
+
+function can_read_namespace(ns: agent_namespace, reader: pubkey): boolean {
+    if (ns.read_policy == "public") return true;
+    if (ns.owner == reader) return true;
+    if (ns.read_policy == "shared") {
+        return access_grant @? { .agent_namespace == ns, .grantee == reader } != null;
+    }
+    return false;
+}
+
+query get_namespace(name: text): namespace_dto {
+    val ns = agent_namespace @ { .name == name };
+    val count = memory_entry @* { .agent_namespace == ns } ( .entry_id );
+    return namespace_dto(
+        name = ns.name,
+        owner = ns.owner,
+        read_policy = ns.read_policy,
+        memory_count = count.size(),
+        created_at = ns.created_at
+    );
+}
+
+query get_namespaces_by_owner(owner: pubkey): list<namespace_dto> {
+    val namespaces = agent_namespace @* { .owner == owner };
+    val result = list<namespace_dto>();
+    for (ns in namespaces) {
+        val count = memory_entry @* { .agent_namespace == ns } ( .entry_id );
+        result.add(namespace_dto(
+            name = ns.name,
+            owner = ns.owner,
+            read_policy = ns.read_policy,
+            memory_count = count.size(),
+            created_at = ns.created_at
+        ));
+    }
+    return result;
+}
+
+query get_public_namespaces(max_count: integer, skip_count: integer): list<namespace_dto> {
+    val namespaces = agent_namespace @* { .read_policy == "public" } limit max_count offset skip_count;
+    val result = list<namespace_dto>();
+    for (ns in namespaces) {
+        val count = memory_entry @* { .agent_namespace == ns } ( .entry_id );
+        result.add(namespace_dto(
+            name = ns.name,
+            owner = ns.owner,
+            read_policy = ns.read_policy,
+            memory_count = count.size(),
+            created_at = ns.created_at
+        ));
+    }
+    return result;
+}
+
+query get_memory(namespace_name: text, entry_id: text, reader: pubkey): memory_dto {
+    val ns = agent_namespace @ { .name == namespace_name };
+    require(can_read_namespace(ns, reader), "No read access to this namespace");
+
+    val entry = memory_entry @ { .agent_namespace == ns, .entry_id == entry_id };
+    return memory_dto(
+        entry_id = entry.entry_id,
+        namespace_name = namespace_name,
+        content = entry.content,
+        source = entry.source,
+        tags = entry.tags,
+        confidence = entry.confidence,
+        created_at = entry.created_at,
+        updated_at = entry.updated_at
+    );
+}
+
+query list_memories(namespace_name: text, reader: pubkey, max_count: integer, skip_count: integer): list<memory_dto> {
+    val ns = agent_namespace @ { .name == namespace_name };
+    require(can_read_namespace(ns, reader), "No read access to this namespace");
+
+    val entries = memory_entry @* { .agent_namespace == ns } (
+        entry_id = .entry_id,
+        ns_name = namespace_name,
+        content = .content,
+        source = .source,
+        tags = .tags,
+        confidence = .confidence,
+        created_at = .created_at,
+        updated_at = .updated_at
+    ) limit max_count offset skip_count;
+
+    val result = list<memory_dto>();
+    for (e in entries) {
+        result.add(memory_dto(
+            entry_id = e.entry_id,
+            namespace_name = e.ns_name,
+            content = e.content,
+            source = e.source,
+            tags = e.tags,
+            confidence = e.confidence,
+            created_at = e.created_at,
+            updated_at = e.updated_at
+        ));
+    }
+    return result;
+}
+
+query search_memories_by_tag(namespace_name: text, tag: text, reader: pubkey): list<memory_dto> {
+    val ns = agent_namespace @ { .name == namespace_name };
+    require(can_read_namespace(ns, reader), "No read access to this namespace");
+
+    val entries = memory_tag @* {
+        .tag == tag,
+        .memory_entry.agent_namespace == ns
+    } (
+        entry_id = .memory_entry.entry_id,
+        content = .memory_entry.content,
+        source = .memory_entry.source,
+        tags = .memory_entry.tags,
+        confidence = .memory_entry.confidence,
+        created_at = .memory_entry.created_at,
+        updated_at = .memory_entry.updated_at
+    );
+
+    val result = list<memory_dto>();
+    for (e in entries) {
+        result.add(memory_dto(
+            entry_id = e.entry_id,
+            namespace_name = namespace_name,
+            content = e.content,
+            source = e.source,
+            tags = e.tags,
+            confidence = e.confidence,
+            created_at = e.created_at,
+            updated_at = e.updated_at
+        ));
+    }
+    return result;
+}
+
+// Semantic recall, part 1: hand the client every embedding in the namespace so
+// it can cosine-rank locally. Only memories that have an embedding are returned.
+query get_namespace_embeddings(namespace_name: text, reader: pubkey): list<embedding_dto> {
+    val ns = agent_namespace @ { .name == namespace_name };
+    require(can_read_namespace(ns, reader), "No read access to this namespace");
+
+    return memory_embedding @* { .memory_entry.agent_namespace == ns } (
+        embedding_dto(
+            entry_id = .memory_entry.entry_id,
+            vector = .vector
+        )
+    );
+}
+
+// Semantic recall, part 2: after ranking, the client fetches full content for
+// just the top-k entry ids. Results come back unordered — the client re-sorts
+// by its own ranking.
+query get_memories_by_ids(namespace_name: text, entry_ids: list<text>, reader: pubkey): list<memory_dto> {
+    val ns = agent_namespace @ { .name == namespace_name };
+    require(can_read_namespace(ns, reader), "No read access to this namespace");
+
+    val entries = memory_entry @* {
+        .agent_namespace == ns,
+        .entry_id in entry_ids
+    } (
+        entry_id = .entry_id,
+        content = .content,
+        source = .source,
+        tags = .tags,
+        confidence = .confidence,
+        created_at = .created_at,
+        updated_at = .updated_at
+    );
+
+    val result = list<memory_dto>();
+    for (e in entries) {
+        result.add(memory_dto(
+            entry_id = e.entry_id,
+            namespace_name = namespace_name,
+            content = e.content,
+            source = e.source,
+            tags = e.tags,
+            confidence = e.confidence,
+            created_at = e.created_at,
+            updated_at = e.updated_at
+        ));
+    }
+    return result;
+}
+
+query count_memories(namespace_name: text, reader: pubkey): integer {
+    val ns = agent_namespace @ { .name == namespace_name };
+    require(can_read_namespace(ns, reader), "No read access to this namespace");
+
+    val entries = memory_entry @* { .agent_namespace == ns } ( .entry_id );
+    return entries.size();
+}
+
+query get_audit_log(namespace_name: text, reader: pubkey, max_count: integer): list<audit_dto> {
+    val ns = agent_namespace @ { .name == namespace_name };
+    require(can_read_namespace(ns, reader), "No read access to this namespace");
+
+    val entries = memory_audit @* { .agent_namespace == ns } (
+        actor = .actor,
+        action = .action,
+        entry_id = .entry_id,
+        detail = .detail,
+        created_at = .created_at
+    ) limit max_count;
+
+    val result = list<audit_dto>();
+    for (e in entries) {
+        result.add(audit_dto(
+            actor = e.actor,
+            action = e.action,
+            entry_id = e.entry_id,
+            detail = e.detail,
+            created_at = e.created_at
+        ));
+    }
+    return result;
+}

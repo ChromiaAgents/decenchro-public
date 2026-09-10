@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Decenchro on-chain memory CLI wrapper
+# Usage: decenchro-mem <command> [args]
+
+CLIENT_DIR="/Users/prem/decenchro/chain/client"
+cd "$CLIENT_DIR"
+exec ./node_modules/.bin/tsx src/cli.ts "$@"

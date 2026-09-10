@@ -1,0 +1,9 @@
+#!/command/with-contenv sh
+# shellcheck shell=sh
+# Companion to ./run. The beacon fires once per container start and then exits 0;
+# 125 is s6's permanent-failure marker, which stops a restart loop and leaves the
+# slot reporting down. A crash (non-zero) is worth retrying.
+case "${1:-0}" in
+    0) exit 125 ;;
+    *) exit 0 ;;
+esac

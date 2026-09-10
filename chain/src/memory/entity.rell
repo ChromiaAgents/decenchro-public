@@ -1,0 +1,48 @@
+entity agent_namespace {
+    key name: text;
+    owner: pubkey;
+    mutable read_policy: text;
+    created_at: timestamp = op_context.last_block_time;
+}
+
+entity memory_entry {
+    index agent_namespace;
+    key entry_id: text;
+    mutable content: text;
+    source: text;
+    mutable tags: text;
+    mutable confidence: integer;
+    created_at: timestamp = op_context.last_block_time;
+    mutable updated_at: timestamp = op_context.last_block_time;
+}
+
+// Embedding vector for a memory, kept in its own entity so the normal
+// list/get queries don't drag ~25KB of floats around. Semantic recall reads
+// these directly and ranks client-side — no Vector DB extension needed.
+entity memory_embedding {
+    key memory_entry;
+    mutable vector: text; // "[0.1,0.2,...]"
+}
+
+// Normalized tag index for memory_entry. The canonical tags string still lives
+// on memory_entry.tags; this entity exists for exact-match tag search.
+entity memory_tag {
+    memory_entry;
+    tag: text;
+    key memory_entry, tag;
+    index tag;
+}
+
+entity access_grant {
+    key agent_namespace, grantee: pubkey;
+    granted_at: timestamp = op_context.last_block_time;
+}
+
+entity memory_audit {
+    index agent_namespace;
+    actor: pubkey;
+    action: text;
+    entry_id: text;
+    detail: text;
+    created_at: timestamp = op_context.last_block_time;
+}

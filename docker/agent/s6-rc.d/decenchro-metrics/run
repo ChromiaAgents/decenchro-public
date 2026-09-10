@@ -1,0 +1,34 @@
+#!/command/with-contenv sh
+# shellcheck shell=sh
+# Authenticated read-only metrics endpoint the console polls for live agent
+# activity (sessions, messages, tool calls, tokens, cost).
+#
+# METRICS_PORT falls back to Render's injected PORT, then to the VM's 9484, so
+# one image serves both a raw-IP droplet and an HTTPS Render service.
+
+# The script refuses to start unauthenticated (SystemExit), which would put s6
+# into a restart loop. Exit cleanly instead and let ./finish mark the slot
+# permanently down — the same pattern the base image's dashboard service uses.
+if [ -z "${METRICS_TOKEN:-}" ]; then
+    echo "[decenchro-metrics] METRICS_TOKEN unset — endpoint disabled" >&2
+    exit 0
+fi
+
+# with-contenv repopulates HOME from /init as /root. Reset it before dropping
+# privileges so HOME-anchored state lands under the data volume.
+export HOME=/opt/data
+export HERMES_HOME="${HERMES_HOME:-/opt/data}"
+# Which port to bind is shared with decenchro-proxy and the readiness beacon —
+# see ports.sh. With the dashboard enabled the proxy owns the public port and
+# forwards /health + /metrics here; without it this binds the public port
+# directly, exactly as before the proxy existed.
+# shellcheck source=../../ports.sh
+. "${DECENCHRO_PAYLOAD:-/opt/decenchro}/ports.sh"
+export METRICS_PORT="$DECENCHRO_METRICS_PORT"
+# And which interface. Loopback behind the proxy so Render cannot detect this
+# port and route public traffic straight at it, bypassing the proxy; 0.0.0.0 when
+# metrics is itself the public server. ports.sh decides.
+export DECENCHRO_METRICS_HOST="$DECENCHRO_METRICS_HOST"
+
+cd /opt/data
+exec s6-setuidgid hermes python3 "${DECENCHRO_PAYLOAD:-/opt/decenchro}/agent-metrics.py"
